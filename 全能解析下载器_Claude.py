@@ -19,6 +19,12 @@ import threading
 import shutil
 import urllib.parse
 from PIL import Image
+# 👇 新增这三行，让 Pillow 自动支持识别 HEIC 格式
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:
+    pass
 from tkinter import filedialog
 import urllib3
 
@@ -695,7 +701,8 @@ class DualPlatformDownloader(ctk.CTk):
             else:
                 # XHS 图片：带 Referer 防 403，不带 Cookie
                 headers = {
-                    "User-Agent":     "Mozilla/5.0",
+                    "User-Agent":     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                    "Accept":         "image/webp,image/jpeg,image/png,*/*;q=0.8", # 💡 核心：明确要求 WebP/JPEG，拒绝 AVIF
                     "Referer":        "https://www.xiaohongshu.com/",
                     "Sec-Fetch-Dest": "image",
                     "Connection":     "keep-alive",
@@ -756,13 +763,17 @@ class DualPlatformDownloader(ctk.CTk):
                                     self.log(f"   ⚡ {name}{ext}: {percent}% ({speed_mb:.1f} MB/s)")
                                     last_print = percent
                                     
-                    if m_type == "image" and (".webp" in url.lower() or "webp" in res.headers.get('Content-Type', '').lower()):
+                    # 替换掉原有的 if m_type == "image" and (".webp" in... 的那一段
+                    if m_type == "image":
                         try:
+                            # 此时 Pillow 已经认识 HEIC 了，可以顺利 open
                             img = Image.open(final_file)
-                            if img.mode in ("RGBA", "P"): img = img.convert("RGB")
-                            img.save(final_file, "JPEG", quality=95)
-                        except: pass
-                        
+                            if img.format != "JPEG":
+                                if img.mode != "RGB": 
+                                    img = img.convert("RGB")
+                                img.save(final_file, "JPEG", quality=95)
+                        except Exception as e:
+                            self.log(f"   ⚠️ 图片转码警告 {name}: {str(e)}")
                     if downloaded == 0:
                         raise Exception("服务器返回了0字节无效文件")
                         
