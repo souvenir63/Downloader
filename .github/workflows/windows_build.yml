@@ -1,0 +1,42 @@
+name: Build Windows App
+
+# 触发条件：当你手动点击运行，或者上传新代码时触发
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest # 借用 GitHub 的最新版 Windows 电脑
+
+    steps:
+    - name: 1. 拉取你的代码
+      uses: actions/checkout@v3
+
+    - name: 2. 安装 Python 环境
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10' # 稳定版本
+
+    - name: 3. 安装第三方库和打包工具
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: 4. 下载 Chromium 浏览器到指定文件夹
+      run: |
+        # 将浏览器下载路径指派到当前目录下的 pw_browsers 文件夹
+        $env:PLAYWRIGHT_BROWSERS_PATH = "$env:GITHUB_WORKSPACE\pw_browsers"
+        playwright install chromium
+
+    - name: 5. 开始打包！(带图标，带浏览器，隐藏黑框)
+      run: |
+        pyinstaller --noconfirm --onedir --windowed --icon="app_icon.ico" --add-data "pw_browsers;pw_browsers" "全能解析下载器_Claude.py"
+
+    - name: 6. 上传打包好的软件给你下载
+      uses: actions/upload-artifact@v3
+      with:
+        name: 全能解析下载器_Windows版
+        path: dist/全能解析下载器_Claude
